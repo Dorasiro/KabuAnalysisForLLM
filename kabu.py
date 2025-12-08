@@ -244,6 +244,86 @@ class DB:
     
 		return False
 
+class Logging:
+		# 所定のログファイルにログを追記する
+	def append_to_log_file(message: str) -> None:
+		if not IS_LOGGING or not message:
+			return
+
+		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
+			f.write(message + "\n")
+
+	@overload
+	def append_to_log_file_from_bm(bm: BaseModel) -> None: ...
+	@overload
+	def append_to_log_file_from_bm(bm: BaseModel, message: str) -> None: ...
+
+	@staticmethod
+	def append_to_log_file_from_bm(bm: BaseModel, message: str | None = None) -> None:
+		if not IS_LOGGING:
+			return
+		
+		line = f"{datetime.now()} | {bm.__class__.__name__} \n" + str(bm.model_dump())
+
+		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
+			if not message:
+				f.write(line + "\n")
+			else:
+				f.write(line + " | " + message + "\n")
+
+	@overload
+	def append_to_log_file_from_dict(payload: dict) -> None: ...
+	@overload
+	def append_to_log_file_from_dict(payload: dict, message: str) -> None: ...
+
+	@staticmethod
+	def append_to_log_file_from_dict(payload: dict, message: str | None = None) -> None:
+		if not IS_LOGGING:
+			return
+		
+		def_name = inspect.currentframe().f_back.f_code.co_name
+
+		if not message:
+			line = f"{datetime.now()} | {def_name} \n"
+		else:
+			line = f"{datetime.now()} | {def_name}  | {message}\n"
+
+		line += str(payload)
+
+		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
+			f.write(line + "\n")
+
+	@overload
+	def append_to_log_file_from_df(df: pandas.DataFrame) -> None: ...
+	@overload
+	def append_to_log_file_from_df(df: pandas.DataFrame, message: str) -> None: ...
+
+	@staticmethod
+	def append_to_log_file_from_df(df: pandas.DataFrame, message: str | None = None) -> None:
+		if not IS_LOGGING:
+			return
+		
+		def_name = inspect.currentframe().f_back.f_code.co_name
+
+		if not message:
+			line = f"{datetime.now()} | {def_name} \n"
+		else:
+			line = f"{datetime.now()} | {def_name}  | {message}\n"
+
+		# dfの大きさが6以下の場合は全行表示
+		if len(df) <= 6:
+			line += df.to_string()
+		# dfの大きさが6を超える場合は最初の３行と最後の３行を表示
+		else:
+			line += df.head(3).to_string() + "\n"
+			line += "(～中略～)\n"
+			line += df.tail(3).to_string()
+
+		line += "\n" + f"({len(df)} rows)\n"
+
+		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
+			f.write(line + "\n")
+
 class GetCurrentPriceInput(BaseModel):
     ticker: str = Field( ..., description="""
 		必ず証券コード＋市場サフィックスを指定してください。日本株は .T を付けます
@@ -257,87 +337,9 @@ class TechnicalAnalysisInput(BaseModel):
 	end_range: datetime = Field(..., description="分析終了日")
 	chart_granularity: ChartGranularity = Field(..., description="チャートの粒度（日足を使用してください）")
 
-# 所定のログファイルにログを追記する
-def append_to_log_file(message: str) -> None:
-	if not IS_LOGGING or not message:
-		return
-
-	with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-		f.write(message + "\n")
-
-@overload
-def append_to_log_file_from_bm(bm: BaseModel) -> None: ...
-@overload
-def append_to_log_file_from_bm(bm: BaseModel, message: str) -> None: ...
-
-@staticmethod
-def append_to_log_file_from_bm(bm: BaseModel, message: str | None = None) -> None:
-	if not IS_LOGGING:
-		return
-	
-	line = f"{datetime.now()} | {bm.__class__.__name__} \n" + str(bm.model_dump())
-
-	with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-		if not message:
-			f.write(line + "\n")
-		else:
-			f.write(line + " | " + message + "\n")
-
-@overload
-def append_to_log_file_from_dict(payload: dict) -> None: ...
-@overload
-def append_to_log_file_from_dict(payload: dict, message: str) -> None: ...
-
-@staticmethod
-def append_to_log_file_from_dict(payload: dict, message: str | None = None) -> None:
-	if not IS_LOGGING:
-		return
-	
-	def_name = inspect.currentframe().f_back.f_code.co_name
-
-	if not message:
-		line = f"{datetime.now()} | {def_name} \n"
-	else:
-		line = f"{datetime.now()} | {def_name}  | {message}\n"
-
-	line += str(payload)
-
-	with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-		f.write(line + "\n")
-
-@overload
-def append_to_log_file_from_df(df: pandas.DataFrame) -> None: ...
-@overload
-def append_to_log_file_from_df(df: pandas.DataFrame, message: str) -> None: ...
-
-@staticmethod
-def append_to_log_file_from_df(df: pandas.DataFrame, message: str | None = None) -> None:
-	if not IS_LOGGING:
-		return
-	
-	def_name = inspect.currentframe().f_back.f_code.co_name
-
-	if not message:
-		line = f"{datetime.now()} | {def_name} \n"
-	else:
-		line = f"{datetime.now()} | {def_name}  | {message}\n"
-
-	# dfの大きさが6以下の場合は全行表示
-	if len(df) <= 6:
-		line += df.to_string()
-	# dfの大きさが6を超える場合は最初の３行と最後の３行を表示
-	else:
-		line += df.head(3).to_string() + "\n"
-		line += "(～中略～)\n"
-		line += df.tail(3).to_string()
-
-	line += "\n" + f"({len(df)} rows)\n"
-
-	with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-		f.write(line + "\n")
-
 class Tools:
 	db = DB()
+	log = Logging()
 
 	def __init__(self):
 		pass
@@ -349,17 +351,17 @@ class Tools:
 			if isinstance(input, dict):
 				input = GetCurrentPriceInput(**input)
 		except ValidationError as e:
-			append_to_log_file_from_dict(input, f"ValidationError: {e}")
+			self.log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
 			raise ValueError("入力値の形式が不正です") from e
 
 		if not input.ticker:
 			err = "銘柄コードが指定されていません"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if not self.db.is_ticker_exists(input.ticker):
 			err = "無効な銘柄コードが指定されました"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 
 		stock = yf.Ticker(input.ticker)
@@ -369,7 +371,7 @@ class Tools:
 		# ちゃんと取得できたかを確認
 		if len(price) <= 0:
 			err = "データの取得に失敗しました"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 
 		current = info.get("currentPrice")
@@ -383,8 +385,8 @@ class Tools:
 			volume = float(price["Volume"].iloc[-1])
 		)
 
-		append_to_log_file_from_bm(input)
-		append_to_log_file_from_dict(result)
+		self.log.append_to_log_file_from_bm(input)
+		self.log.append_to_log_file_from_dict(result)
 
 		return json.dumps(result, ensure_ascii=False)
 	
@@ -394,27 +396,27 @@ class Tools:
 			if isinstance(input, dict):
 				input = TechnicalAnalysisInput(**input)
 		except ValidationError as e:
-			append_to_log_file_from_dict(input, f"ValidationError: {e}")
+			self.log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
 			raise ValueError("入力値の形式が不正です") from e
 
 		if not input.ticker:
 			err = "銘柄コードが指定されていません。"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if not self.db.is_ticker_exists(input.ticker):
 			err = "無効な銘柄コードが指定されました。"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if input.begin_range is None:
 			err = "解析期間の開始日が指定されていません。"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if input.end_range is None:
 			err = "解析期間の終了日が指定されていません。"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		# これより後は両変数ともにdatetimeとして扱う
@@ -429,7 +431,7 @@ class Tools:
 		# 開始日と終了日が逆転してた場合のエラー
 		if input.begin_range > input.end_range:
 			err = "解析機関の開始日と終了日に矛盾があります。"
-			append_to_log_file_from_bm(input, err)
+			self.log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		# 指定した日が土日祝の場合はデータが取れないので範囲を狭める方向にずらす
@@ -444,7 +446,7 @@ class Tools:
 		chart_granularity = ChartGranularity.DAILY
 		
 		# 入力に問題はなさそうなので一旦ログに書き込む
-		append_to_log_file_from_bm(input)
+		self.log.log.append_to_log_file_from_bm(input)
 
 		db = DB()
 
@@ -524,5 +526,5 @@ class Tools:
 		# 小数点を丸める
 		df = df.round(2)
 
-		append_to_log_file_from_df(df)
+		self.log.append_to_log_file_from_df(df)
 		return df.to_json(orient="records", date_format="iso")
