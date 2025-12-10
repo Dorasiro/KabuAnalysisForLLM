@@ -1,6 +1,6 @@
-from kabu import Backend
+from kabu import DB
 
-b = Backend()
+b = DB()
 
 def Test_is_ticker_exists():
     print(b.is_ticker_exists(""))
