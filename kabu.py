@@ -58,6 +58,64 @@ def convert_to_datetime(d) -> datetime:
 class DB:
 	def __init__(self):
 		pass
+
+		# 現在時刻が取引時間中であるか
+	def is_market_active(self, ticker: str) -> bool:
+		cur.execute("""
+			SELECT 
+    			m.timezone,
+    			m.open1,
+    			m.close1,
+    			m.open2,
+    			m.close2
+			FROM securities s
+			JOIN markets m ON s.market_id = m.id
+			WHERE s.code = %s
+		""", (ticker,))
+
+		row = cur.fetchone()
+		if not row:
+			return False  # 該当銘柄なし
+    
+    	# 現在時刻を市場のタイムゾーンで取得
+		t = datetime.now(ZoneInfo(row[0])).time()
+		now = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+    
+    	# 時間1の判定
+		if row[1] <= now <= row[2]:
+			return True
+    
+    	# 時間2がある場合のみ判定
+		if row[3] and row[4]:
+			if row[3] <= now <= row[4]:
+				return True
+    
+		return False
+	
+	# 現在時刻が取引開始時刻よりも後であるか
+	def is_market_open(self, ticker: str) -> bool:
+		cur.execute("""
+			SELECT 
+    			m.timezone,
+    			m.open1
+			FROM securities s
+			JOIN markets m ON s.market_id = m.id
+			WHERE s.code = %s
+		""", (ticker,))
+
+		row = cur.fetchone()
+		if not row:
+			return False  # 該当銘柄なし
+    
+    	# 現在時刻を市場のタイムゾーンで取得
+		t = datetime.now(ZoneInfo(row[0])).time()
+		now = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+    
+    	# 時間1の判定
+		if row[1] <= now:
+			return True
+    
+		return False
 	
 	# yfinanceから取得した株価をDBに格納する
 	# return：格納件数
@@ -75,14 +133,12 @@ class DB:
 			if chart_granularity == ChartGranularity.MINUTE:
 				time = index.time()
 
-			if index.date() == date.today() and self.isMarketOpen(ticker):
+			if index.date() == date.today() and self.is_market_open(ticker):
 				cur.execute("""
-                	UPDATE prices
-                	SET open=%s, high=%s, low=%s, close=%s, volume=%s
-                	WHERE security_id = (SELECT id FROM securities WHERE code=%s)
-                  	AND date=%s
-                  	AND (%s IS NULL OR time=%s)
-            	""", (row["Open"], row["High"], row["Low"], row["Close"], row["Volume"], ticker, index.date(), time, time))
+    				INSERT INTO prices (security_id, date, time, open, high, low, close, volume)
+    				VALUES ((SELECT id FROM securities WHERE code=%s), %s, %s, %s, %s, %s, %s, %s)
+					ON DUPLICATE KEY UPDATE open = VALUES(open), high = VALUES(high), low  = VALUES(low), close = VALUES(close), volume = VALUES(volume)
+				""", (ticker, index.date(), time, row["Open"], row["High"], row["Low"], row["Close"], row["Volume"]))
 
 			else:
 				cur.execute("""
@@ -185,64 +241,6 @@ class DB:
 			return None
 		
 		return end_record
-	
-	# 現在時刻が取引時間中であるか
-	def is_market_active(self, ticker: str) -> bool:
-		cur.execute("""
-			SELECT 
-    			m.timezone,
-    			m.open1,
-    			m.close1,
-    			m.open2,
-    			m.close2
-			FROM securities s
-			JOIN markets m ON s.market_id = m.id
-			WHERE s.code = %s
-		""", (ticker,))
-
-		row = cur.fetchone()
-		if not row:
-			return False  # 該当銘柄なし
-    
-    	# 現在時刻を市場のタイムゾーンで取得
-		t = datetime.now(ZoneInfo(row[0])).time()
-		now = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
-    
-    	# 時間1の判定
-		if row[1] <= now <= row[2]:
-			return True
-    
-    	# 時間2がある場合のみ判定
-		if row[3] and row[4]:
-			if row[3] <= now <= row[4]:
-				return True
-    
-		return False
-	
-	# 現在時刻が取引開始時刻よりも後であるか
-	def is_market_open(self, ticker: str) -> bool:
-		cur.execute("""
-			SELECT 
-    			m.timezone,
-    			m.open1
-			FROM securities s
-			JOIN markets m ON s.market_id = m.id
-			WHERE s.code = %s
-		""", (ticker,))
-
-		row = cur.fetchone()
-		if not row:
-			return False  # 該当銘柄なし
-    
-    	# 現在時刻を市場のタイムゾーンで取得
-		t = datetime.now(ZoneInfo(row[0])).time()
-		now = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
-    
-    	# 時間1の判定
-		if row[1] <= now:
-			return True
-    
-		return False
 
 class Logging:
 		# 所定のログファイルにログを追記する
@@ -331,7 +329,7 @@ class GetCurrentPriceInput(BaseModel):
 		会社名ではなく証券コードを入力してください。""",
     )
 
-class TechnicalAnalysisInput(BaseModel):
+class GetPriceInput(BaseModel):
 	ticker: str = Field(..., description="証券コード+市場サフィックス（トヨタの場合は7203.Tなど）")
 	begin_range: datetime = Field(..., description="分析開始日")
 	end_range: datetime = Field(..., description="分析終了日")
@@ -390,11 +388,12 @@ class Tools:
 
 		return json.dumps(result, ensure_ascii=False)
 	
-	# テクニカル分析を実行する　DBよりデータを取得して分析を行う　足りないデータがあれば分析前にyfinanceを使用し、DBに格納する
-	def do_technical_analysis(self, input: TechnicalAnalysisInput) -> str:
+	# 指定範囲の株価情報をDBから読みだす　DBになければyfから取得する
+	# 内部用　LLMに公開する際にはDataFrameをJSONに変換する関数を挟む
+	def _get_price(self, input: GetPriceInput) -> pandas.DataFrame:
 		try:
 			if isinstance(input, dict):
-				input = TechnicalAnalysisInput(**input)
+				input = GetPriceInput(**input)
 		except ValidationError as e:
 			self.log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
 			raise ValueError("入力値の形式が不正です") from e
@@ -446,7 +445,7 @@ class Tools:
 		chart_granularity = ChartGranularity.DAILY
 		
 		# 入力に問題はなさそうなので一旦ログに書き込む
-		self.log.log.append_to_log_file_from_bm(input)
+		self.log.append_to_log_file_from_bm(input)
 
 		db = DB()
 
@@ -481,26 +480,37 @@ class Tools:
 
 		# DBに存在するデータよりも後のデータが必要な場合
 		# end_recordの翌日から今日までのデータを取ってくる
-		canGet = False
 		if end_record is not None and end_record < input.end_range.date():
 			# 不足分のデータが今日のみの場合
 			if end_record + timedelta(days=1) == now.date():
 				# 現在時刻が取引時間開始時刻以降の場合はデータを取ってくる
 				if db.is_market_open(input.ticker):
-					canGet = True
+					history = yf.Ticker(input.ticker).history(period="1d")
+					db.insert_into_prices(input.ticker, history, chart_granularity)
 			# 不足分のデータが今日のみでない場合は今日のデータも存在しないので取ってくる
 			else:
-				canGet = True
-
-			if canGet:
 				history = yf.Ticker(input.ticker).history(start=date_to_yf_history((end_record + timedelta(days=1))), end=date_to_yf_history(now.date()))
 				db.insert_into_prices(input.ticker, history, chart_granularity)
-
+		
 		df = db.select_from_prices(input.ticker, input.begin_range, input.end_range, chart_granularity)
-		# 解析に移る前にデータが取れていることを確認する（が、通常は問題ないはず）
+		# データが取れていることを確認する（が、通常は問題ないはず）
 		if df is None:
-			raise LookupError("failed to retrieve data from the database")
+			raise LookupError("データフレームが空です。")
+		
+		# 日付をindexからレコード内に含めるように変更
+		df = df.reset_index()
+		# 日付のレコードが自動的にindexとなるのでDateに直しておく
+		df = df.rename(columns={"index": "Date",})
 
+		self.log.append_to_log_file_from_df(df)
+		return df
+	
+	# 指定範囲の株価情報をDBから読みだす　DBになければyfから取得する
+	def get_price(self, input: GetPriceInput) -> str:
+		return self._get_price(input).to_json(orient="records", date_format="iso")
+	
+	# テクニカル分析の内部関数　引数、戻り値ともに他の関数と連携しやすいDataFrameとする
+	def _do_technical_analysis(self, df: pandas.DataFrame) -> pandas.DataFrame:
 		# 移動平均線（短期）
 		df.ta.sma(length=25, append=True)
 		# 移動平均線（中期）
@@ -512,12 +522,8 @@ class Tools:
 		# MACD
 		df.ta.macd(append=True)
 
-		# 日付をindexからレコード内に含めるように変更
-		df = df.reset_index()
-		# 日付のレコードが自動的にindexとなるのでDateに直しておく
 		# MACD関連の列名が分かりづらいので一般的な形に直しておく
 		df = df.rename(columns={
-			"index": "Date",
 	    	"MACD_12_26_9": "MACD",
     		"MACDh_12_26_9": "MACD_histogram",
     		"MACDs_12_26_9": "MACD_signal"
@@ -527,4 +533,9 @@ class Tools:
 		df = df.round(2)
 
 		self.log.append_to_log_file_from_df(df)
-		return df.to_json(orient="records", date_format="iso")
+		return df
+	
+	# テクニカル分析を実行する　self.get_priceでデータを取得して分析を行う
+	def do_technical_analysis(self, input: GetPriceInput) -> str:
+		df = self._get_price(input)
+		return self._do_technical_analysis(df).to_json(orient="records", date_format="iso")
