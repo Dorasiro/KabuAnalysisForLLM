@@ -323,17 +323,66 @@ class Logging:
 			f.write(line + "\n")
 
 class GetCurrentPriceInput(BaseModel):
-    ticker: str = Field( ..., description="""
-		必ず証券コード＋市場サフィックスを指定してください。日本株は .T を付けます
-		例：トヨタの場合は7203.T、NTTの場合は9432.T、IHIの場合は7013.T
-		会社名ではなく証券コードを入力してください。""",
-    )
+    ticker: str
 
 class GetPriceInput(BaseModel):
 	ticker: str = Field(..., description="証券コード+市場サフィックス（トヨタの場合は7203.Tなど）")
 	begin_range: datetime = Field(..., description="分析開始日")
 	end_range: datetime = Field(..., description="分析終了日")
 	chart_granularity: ChartGranularity = Field(..., description="チャートの粒度（日足を使用してください）")
+
+class Backend:
+	db = DB()
+	log = Logging()
+
+	def __init__(self):
+		pass
+
+	# リアルタイムの情報を返すときに使う想定　DBに格納しない
+	# ex)今～の株価何円？ -> この関数を経由して返す
+	def get_current_price(self, input: GetCurrentPriceInput) -> str:
+		try:
+			if isinstance(input, dict):
+				input = GetCurrentPriceInput(**input)
+		except ValidationError as e:
+			self.log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
+			raise ValueError("入力値の形式が不正です") from e
+
+		if not input.ticker:
+			err = "銘柄コードが指定されていません"
+			self.log.append_to_log_file_from_bm(input, err)
+			raise ValueError(err)
+		
+		if not self.db.is_ticker_exists(input.ticker):
+			err = "無効な銘柄コードが指定されました"
+			self.log.append_to_log_file_from_bm(input, err)
+			raise ValueError(err)
+
+		stock = yf.Ticker(input.ticker)
+		info = stock.info
+		price = stock.history(period="1d")
+
+		# ちゃんと取得できたかを確認
+		if len(price) <= 0:
+			err = "データの取得に失敗しました"
+			self.log.append_to_log_file_from_bm(input, err)
+			raise ValueError(err)
+
+		current = info.get("currentPrice")
+
+		result = dict(
+			current = float(current) if current is not None else None,
+			open = float(price["Open"].iloc[-1]),
+			high = float(price["High"].iloc[-1]),
+			low = float(price["Low"].iloc[-1]),
+			close = float(price["Close"].iloc[-1]),
+			volume = float(price["Volume"].iloc[-1])
+		)
+
+		self.log.append_to_log_file_from_bm(input)
+		self.log.append_to_log_file_from_dict(result)
+
+		return json.dumps(result, ensure_ascii=False)
 
 class Tools:
 	db = DB()
