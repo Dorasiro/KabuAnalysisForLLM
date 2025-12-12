@@ -5,6 +5,9 @@ import pandas
 import my_model
 import kabu
 
+#import workspace.KabuAnalysisForLLM.my_model as my_model
+#import workspace.KabuAnalysisForLLM.kabu as kabu
+
 class GetCurrentPriceInput(kabu.GetCurrentPriceInput, my_model.MyModel):
 	ticker: str = pydantic.Field( ..., description="""
 		必ず証券コード＋市場サフィックスを指定してください。日本株は .T を付けます
@@ -14,8 +17,8 @@ class GetCurrentPriceInput(kabu.GetCurrentPriceInput, my_model.MyModel):
 
 class GetPriceInput(kabu.GetPriceInput, my_model.MyModel):
 	ticker: str = pydantic.Field(..., description="証券コード+市場サフィックス（トヨタの場合は7203.Tなど）")
-	begin_range: dt.datetime = pydantic.Field(..., description="分析開始日")
-	end_range: dt.datetime = pydantic.Field(..., description="分析終了日")
+	begin_range: dt.datetime = pydantic.Field(..., description="分析開始日（yyyy/mm/dd）")
+	end_range: dt.datetime = pydantic.Field(..., description="分析終了日（yyyy/mm/dd）")
 	chart_granularity: kabu.ChartGranularity = pydantic.Field(..., description="チャートの粒度（日足：0）")
 
 class Tools:
