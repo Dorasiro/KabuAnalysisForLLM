@@ -27,7 +27,7 @@ class GetPriceInput(kabu.GetPriceInput, my_model.MyModel):
 	ticker: str = pydantic.Field(..., description="証券コード+市場サフィックス（トヨタの場合は7203.Tなど）")
 	begin_range: dt.datetime = pydantic.Field(..., description="分析期間の開始日（yyyy-mm-dd）")
 	end_range: dt.datetime = pydantic.Field(..., description="分析期間の終了日（yyyy-mm-dd）")
-	chart_granularity: kabu.ChartGranularity = pydantic.Field(..., description="チャートの粒度（日足：0）")
+	chart_granularity: str = pydantic.Field(..., description="チャートの粒度（日足：daily）")
 
 class Tools:
 	b = kabu.Backend()
@@ -45,5 +45,5 @@ class Tools:
     
 t = Tools()
 # print(t.get_current_price(GetCurrentPriceInput(ticker="9432.T")))
-print(t.get_price(GetPriceInput(ticker="7013.T", begin_range=dt.datetime(2025, 4, 1, 0,0,0), end_range=dt.datetime.now(), chart_granularity=kabu.ChartGranularity.DAILY)))
-#rint(t.do_technical_analysis(GetPriceInput(ticker="7013.T", begin_range=dt.datetime(2025, 4, 1, 0,0,0), end_range=dt.datetime.now(), chart_granularity=kabu.ChartGranularity.DAILY)))
+print(t.get_price(GetPriceInput(ticker="7013.T", begin_range=dt.datetime(2025, 4, 1, 0,0,0), end_range=dt.datetime.now(), chart_granularity="daily")))
+#rint(t.do_technical_analysis(GetPriceInput(ticker="7013.T", begin_range=dt.datetime(2025, 4, 1, 0,0,0), end_range=dt.datetime.now(), chart_granularity="daily")))

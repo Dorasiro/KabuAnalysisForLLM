@@ -11,13 +11,6 @@ import pandas
 import pandas_ta_classic as ta
 import jpholiday
 
-# チャートの粒度の定義
-class ChartGranularity(IntEnum):
-	# 日足
-	DAILY = auto()
-	# 分足
-	MINUTE = auto()
-
 # 自作ログの出力先
 KABU_LOG_FILE = "kabu-log.txt"
 IS_LOGGING: bool = True
@@ -119,7 +112,7 @@ class DB:
 	
 	# yfinanceから取得した株価をDBに格納する
 	# return：格納件数
-	def insert_into_prices(self, ticker: str, prices: pandas.DataFrame, chart_granularity: ChartGranularity) -> int:
+	def insert_into_prices(self, ticker: str, prices: pandas.DataFrame, chart_granularity: str) -> int:
 		if not ticker:
 			raise ValueError("ticker is empty or none")
 		
@@ -130,7 +123,7 @@ class DB:
 		for index, row in prices.iterrows():
 
 			time = None
-			if chart_granularity == ChartGranularity.MINUTE:
+			if chart_granularity == "minute":
 				time = index.time()
 
 			if index.date() == date.today() and self.is_market_open(ticker):
@@ -156,8 +149,8 @@ class DB:
 	
 	# pricesテーブルからOHLCVの値を取得する
 	# データがDBに存在するかの確認はしないので注意
-	def select_from_prices(self, ticker: str, begin_range: datetime, end_range: datetime, chart_granularity: ChartGranularity) -> pandas.DataFrame:
-		if chart_granularity == ChartGranularity.DAILY:
+	def select_from_prices(self, ticker: str, begin_range: datetime, end_range: datetime, chart_granularity: str) -> pandas.DataFrame:
+		if chart_granularity == "daily":
 			# begin_range、end_rangeにに渡されているのがdatetimeである場合はdateに変換しておく
 			if type(begin_range) is datetime:
 				begin_range = begin_range.date()
@@ -329,7 +322,7 @@ class GetPriceInput(BaseModel):
 	ticker: str 
 	begin_range: datetime
 	end_range: datetime
-	chart_granularity: ChartGranularity
+	chart_granularity: str
 
 class Backend:
 	db = DB()
@@ -438,7 +431,7 @@ class Backend:
 			input.end_range = input.end_range - timedelta(days=1)
 		
 		# 当面は日足のみ対応なのでchart_granularityに何が入力されていても日足を指定したものとして扱う
-		chart_granularity = ChartGranularity.DAILY
+		chart_granularity = "daily"
 		
 		# 入力に問題はなさそうなので一旦ログに書き込む
 		self.log.append_to_log_file_from_bm(input)
