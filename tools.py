@@ -44,6 +44,6 @@ class Tools:
 	#	return self.b.do_technical_analysis(df).to_json(orient="records", date_format="iso")
     
 t = Tools()
-# print(t.get_current_price(GetCurrentPriceInput(ticker="9432.T")))
+print(t.get_current_price(GetCurrentPriceInput(ticker="9432.T")))
 print(t.get_price(GetPriceInput(ticker="7013.T", begin_range=dt.datetime(2025, 4, 1, 0,0,0), end_range=dt.datetime.now(), chart_granularity="daily")))
-#rint(t.do_technical_analysis(GetPriceInput(ticker="7013.T", begin_range=dt.datetime(2025, 4, 1, 0,0,0), end_range=dt.datetime.now(), chart_granularity="daily")))
+#print(t.do_technical_analysis(GetPriceInput(ticker="7013.T", begin_range=dt.datetime(2025, 4, 1, 0,0,0), end_range=dt.datetime.now(), chart_granularity="daily")))

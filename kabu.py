@@ -17,7 +17,8 @@ IS_LOGGING: bool = True
 
 # DB接続
 # タイムアウトの場合はOperationalErrorで落ちる
-conn = MySQLdb.connect(
+def get_connection() ->  MySQLdb.Connection:
+	conn = MySQLdb.connect(
     	#host="db",        # docker-compose の service 名
 		host="192.168.2.199",
     	user="user",      # docker-compose.yml の MYSQL_USER
@@ -26,8 +27,18 @@ conn = MySQLdb.connect(
     	port=3306,
 		connect_timeout=10
 	)
+	return conn
 
-cur = conn.cursor()
+conn = get_connection()
+
+def get_cursor():
+    try:
+        conn.ping(reconnect=True)
+        return conn.cursor()
+    except:
+        # 再接続
+        conn = get_connection()
+        return conn.cursor()
 
 # yfinanceのticker.historyに設定できるYYYY-MM-DDの形に変換
 # 分足データは後から取得できないため、dateのみ考慮
@@ -54,6 +65,7 @@ class DB:
 
 		# 現在時刻が取引時間中であるか
 	def is_market_active(self, ticker: str) -> bool:
+		cur = get_cursor()
 		cur.execute("""
 			SELECT 
     			m.timezone,
@@ -87,6 +99,7 @@ class DB:
 	
 	# 現在時刻が取引開始時刻よりも後であるか
 	def is_market_open(self, ticker: str) -> bool:
+		cur = get_cursor()
 		cur.execute("""
 			SELECT 
     			m.timezone,
@@ -126,6 +139,7 @@ class DB:
 			if chart_granularity == "minute":
 				time = index.time()
 
+			cur = get_cursor()
 			if index.date() == date.today() and self.is_market_open(ticker):
 				cur.execute("""
     				INSERT INTO prices (security_id, date, time, open, high, low, close, volume)
@@ -158,6 +172,7 @@ class DB:
 			if type(end_range) is datetime:
 				end_range = end_range.date()
  
+			cur = get_cursor()
 			cur.execute("""
 				SELECT date, COALESCE(time, '00:00:00') AS time, open, high, low, close, volume
 				FROM prices p
@@ -185,6 +200,7 @@ class DB:
 		if not ticker:
 			return False
 		
+		cur = get_cursor()
 		cur.execute("""
 				SELECT 1
 				FROM securities
@@ -198,6 +214,7 @@ class DB:
 		if not ticker:
 			raise ValueError("ticker is empty or none")
 		
+		cur = get_cursor()
 		cur.execute("""
 			SELECT date, time
 			FROM prices p
@@ -219,6 +236,7 @@ class DB:
 		if not ticker:
 			raise ValueError("ticker is empty or none")
 		
+		cur = get_cursor()
 		cur.execute("""
 			SELECT date, time
 			FROM prices p
