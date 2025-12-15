@@ -1,19 +1,14 @@
 from enum import IntEnum, auto
 from datetime import datetime, date, time, timedelta
 from zoneinfo import ZoneInfo
-from typing import overload
 import json
-import inspect
 from pydantic import BaseModel, Field, ValidationError
 import yfinance as yf
 import pandas
 import pandas_ta_classic as ta
 import jpholiday
 import DB
-
-# 自作ログの出力先
-KABU_LOG_FILE = "kabu-log.txt"
-IS_LOGGING: bool = True
+from Logging import Logging as log
 
 # yfinanceのticker.historyに設定できるYYYY-MM-DDの形に変換
 # 分足データは後から取得できないため、dateのみ考慮
@@ -34,88 +29,6 @@ def convert_to_datetime(d) -> datetime:
     
     raise ValueError("引数にはdateもしくはdatetime型の変数を渡してください。")
 
-
-
-class Logging:
-		# 所定のログファイルにログを追記する
-	def append_to_log_file(message: str) -> None:
-		if not IS_LOGGING or not message:
-			return
-
-		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-			f.write(message + "\n")
-
-	@overload
-	def append_to_log_file_from_bm(bm: BaseModel) -> None: ...
-	@overload
-	def append_to_log_file_from_bm(bm: BaseModel, message: str) -> None: ...
-
-	@staticmethod
-	def append_to_log_file_from_bm(bm: BaseModel, message: str | None = None) -> None:
-		if not IS_LOGGING:
-			return
-		
-		line = f"{datetime.now()} | {bm.__class__.__name__} \n" + str(bm.model_dump())
-
-		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-			if not message:
-				f.write(line + "\n")
-			else:
-				f.write(line + " | " + message + "\n")
-
-	@overload
-	def append_to_log_file_from_dict(payload: dict) -> None: ...
-	@overload
-	def append_to_log_file_from_dict(payload: dict, message: str) -> None: ...
-
-	@staticmethod
-	def append_to_log_file_from_dict(payload: dict, message: str | None = None) -> None:
-		if not IS_LOGGING:
-			return
-		
-		def_name = inspect.currentframe().f_back.f_code.co_name
-
-		if not message:
-			line = f"{datetime.now()} | {def_name} \n"
-		else:
-			line = f"{datetime.now()} | {def_name}  | {message}\n"
-
-		line += str(payload)
-
-		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-			f.write(line + "\n")
-
-	@overload
-	def append_to_log_file_from_df(df: pandas.DataFrame) -> None: ...
-	@overload
-	def append_to_log_file_from_df(df: pandas.DataFrame, message: str) -> None: ...
-
-	@staticmethod
-	def append_to_log_file_from_df(df: pandas.DataFrame, message: str | None = None) -> None:
-		if not IS_LOGGING:
-			return
-		
-		def_name = inspect.currentframe().f_back.f_code.co_name
-
-		if not message:
-			line = f"{datetime.now()} | {def_name} \n"
-		else:
-			line = f"{datetime.now()} | {def_name}  | {message}\n"
-
-		# dfの大きさが6以下の場合は全行表示
-		if len(df) <= 6:
-			line += df.to_string()
-		# dfの大きさが6を超える場合は最初の３行と最後の３行を表示
-		else:
-			line += df.head(3).to_string() + "\n"
-			line += "(～中略～)\n"
-			line += df.tail(3).to_string()
-
-		line += "\n" + f"({len(df)} rows)\n"
-
-		with open(KABU_LOG_FILE, "a", encoding="utf-8") as f:
-			f.write(line + "\n")
-
 class GetCurrentPriceInput(BaseModel):
     ticker: str
 
@@ -127,7 +40,6 @@ class GetPriceInput(BaseModel):
 
 class Backend:
 	db = DB.DB()
-	log = Logging()
 
 	def __init__(self):
 		pass
@@ -139,17 +51,17 @@ class Backend:
 			if isinstance(input, dict):
 				input = GetCurrentPriceInput(**input)
 		except ValidationError as e:
-			self.log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
+			log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
 			raise ValueError("入力値の形式が不正です") from e
 
 		if not input.ticker:
 			err = "銘柄コードが指定されていません"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if not self.db.is_ticker_exists(input.ticker):
 			err = "無効な銘柄コードが指定されました"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 
 		stock = yf.Ticker(input.ticker)
@@ -159,7 +71,7 @@ class Backend:
 		# ちゃんと取得できたかを確認
 		if len(price) <= 0:
 			err = "データの取得に失敗しました"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 
 		current = info.get("currentPrice")
@@ -173,8 +85,8 @@ class Backend:
 			volume = float(price["Volume"].iloc[-1])
 		)
 
-		self.log.append_to_log_file_from_bm(input)
-		self.log.append_to_log_file_from_dict(result)
+		log.append_to_log_file_from_bm(input)
+		log.append_to_log_file_from_dict(result)
 
 		return json.dumps(result, ensure_ascii=False)
 	
@@ -185,27 +97,27 @@ class Backend:
 			if isinstance(input, dict):
 				input = GetPriceInput(**input)
 		except ValidationError as e:
-			self.log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
+			log.append_to_log_file_from_dict(input, f"ValidationError: {e}")
 			raise ValueError("入力値の形式が不正です") from e
 
 		if not input.ticker:
 			err = "銘柄コードが指定されていません。"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if not self.db.is_ticker_exists(input.ticker):
 			err = "無効な銘柄コードが指定されました。"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if input.begin_range is None:
 			err = "解析期間の開始日が指定されていません。"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		if input.end_range is None:
 			err = "解析期間の終了日が指定されていません。"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		# これより後は両変数ともにdatetimeとして扱う
@@ -220,7 +132,7 @@ class Backend:
 		# 開始日と終了日が逆転してた場合のエラー
 		if input.begin_range > input.end_range:
 			err = "解析機関の開始日と終了日に矛盾があります。"
-			self.log.append_to_log_file_from_bm(input, err)
+			log.append_to_log_file_from_bm(input, err)
 			raise ValueError(err)
 		
 		# 指定した日が土日祝の場合はデータが取れないので範囲を狭める方向にずらす
@@ -235,7 +147,7 @@ class Backend:
 		chart_granularity = "daily"
 		
 		# 入力に問題はなさそうなので一旦ログに書き込む
-		self.log.append_to_log_file_from_bm(input)
+		log.append_to_log_file_from_bm(input)
 
 		# DBに格納されているデータの範囲を取得する これらは(date, time)のタプルなので注意
 		# 当面は日足のみ対応なのでdateのみを抜き出す（Noneのときはそもそも抜き出せないから何もしない）
@@ -290,7 +202,7 @@ class Backend:
 		# 日付のレコードが自動的にindexとなるのでDateに直しておく
 		df = df.rename(columns={"index": "Date",})
 
-		self.log.append_to_log_file_from_df(df)
+		log.append_to_log_file_from_df(df)
 		return df
 	
 	# テクニカル分析の内部関数　引数、戻り値ともに他の関数と連携しやすいDataFrameとする
@@ -316,5 +228,5 @@ class Backend:
 		# 小数点を丸める
 		df = df.round(2)
 
-		self.log.append_to_log_file_from_df(df)
+		log.append_to_log_file_from_df(df)
 		return df
