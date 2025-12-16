@@ -1,6 +1,7 @@
 import datetime as dt
 import MySQLdb
 import pandas
+from zoneinfo import ZoneInfo
 
 class DB:
     # 初回get_cursor実行時に接続される
@@ -59,7 +60,7 @@ class DB:
             return False  # 該当銘柄なし
     
         # 現在時刻を市場のタイムゾーンで取得
-        t = dt.datetime.now(dt.ZoneInfo(row[0])).time()
+        t = dt.datetime.now(ZoneInfo(row[0])).time()
         now = dt.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
     
         # 時間1の判定
@@ -90,7 +91,7 @@ class DB:
             return False  # 該当銘柄なし
     
         # 現在時刻を市場のタイムゾーンで取得
-        t = dt.datetime.now(dt.ZoneInfo(row[0])).time()
+        t = dt.datetime.now(ZoneInfo(row[0])).time()
         now = dt.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
     
         # 時間1の判定
