@@ -9,13 +9,20 @@ class Logging:
     KABU_LOG_FILE = "kabu-log.txt"
     IS_LOGGING: bool = True
 
+    def __init__(self, logFileName, isLogging: bool = True):
+        if not logFileName:
+            self.IS_LOGGING = False
+            return
+        
+        self.KABU_LOG_FILE = logFileName
+        self.IS_LOGGING = isLogging
+
     # 所定のログファイルにログを追記する
-    @classmethod
-    def append_to_log_file(cls, message: str) -> None:
-        if not cls.IS_LOGGING or not message:
+    def append_to_log_file(self, message: str) -> None:
+        if not self.IS_LOGGING or not message:
             return
 
-        with open(cls.KABU_LOG_FILE, "a", encoding="utf-8") as f:
+        with open(self.KABU_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(message + "\n")
 
     @overload
@@ -23,14 +30,13 @@ class Logging:
     @overload
     def append_to_log_file_from_bm(bm: BaseModel, message: str) -> None: ...
 
-    @classmethod
-    def append_to_log_file_from_bm(cls, bm: BaseModel, message: str | None = None) -> None:
-        if not cls.IS_LOGGING:
+    def append_to_log_file_from_bm(self, bm: BaseModel, message: str | None = None) -> None:
+        if not self.IS_LOGGING:
             return
         
         line = f"{dt.datetime.now()} | {bm.__class__.__name__} \n" + str(bm.model_dump())
 
-        with open(cls.KABU_LOG_FILE, "a", encoding="utf-8") as f:
+        with open(self.KABU_LOG_FILE, "a", encoding="utf-8") as f:
             if not message:
                 f.write(line + "\n")
             else:
@@ -41,9 +47,8 @@ class Logging:
     @overload
     def append_to_log_file_from_dict(payload: dict, message: str) -> None: ...
 
-    @classmethod
-    def append_to_log_file_from_dict(cls, payload: dict, message: str | None = None) -> None:
-        if not cls.IS_LOGGING:
+    def append_to_log_file_from_dict(self, payload: dict, message: str | None = None) -> None:
+        if not self.IS_LOGGING:
             return
         
         def_name = inspect.currentframe().f_back.f_code.co_name
@@ -55,7 +60,7 @@ class Logging:
 
         line += str(payload)
 
-        with open(cls.KABU_LOG_FILE, "a", encoding="utf-8") as f:
+        with open(self.KABU_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
 
     @overload
@@ -63,9 +68,8 @@ class Logging:
     @overload
     def append_to_log_file_from_df(df: pandas.DataFrame, message: str) -> None: ...
 
-    @classmethod
-    def append_to_log_file_from_df(cls, df: pandas.DataFrame, message: str | None = None) -> None:
-        if not cls.IS_LOGGING:
+    def append_to_log_file_from_df(self, df: pandas.DataFrame, message: str | None = None) -> None:
+        if not self.IS_LOGGING:
             return
         
         def_name = inspect.currentframe().f_back.f_code.co_name
@@ -86,5 +90,5 @@ class Logging:
 
         line += "\n" + f"({len(df)} rows)\n"
 
-        with open(cls.KABU_LOG_FILE, "a", encoding="utf-8") as f:
+        with open(self.KABU_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
