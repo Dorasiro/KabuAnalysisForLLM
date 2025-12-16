@@ -1,4 +1,4 @@
-from Logging import Logging
+from my_logging import Logging
 
 if __name__ == "__main__":
     log: Logging = Logging("x", False)

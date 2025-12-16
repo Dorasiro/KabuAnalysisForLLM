@@ -1,7 +1,7 @@
 import inspect
 from typing import overload
 import datetime as dt
-from pydantic import BaseModel, Field, ValidationError
+import pydantic
 import pandas
 
 class Logging:
@@ -27,11 +27,11 @@ class Logging:
             f.write(message + "\n")
 
     @overload
-    def append_to_log_file_from_bm(bm: BaseModel) -> None: ...
+    def append_to_log_file_from_bm(bm: pydantic.BaseModel) -> None: ...
     @overload
-    def append_to_log_file_from_bm(bm: BaseModel, message: str) -> None: ...
+    def append_to_log_file_from_bm(bm: pydantic.BaseModel, message: str) -> None: ...
 
-    def append_to_log_file_from_bm(self, bm: BaseModel, message: str | None = None) -> None:
+    def append_to_log_file_from_bm(self, bm: pydantic.BaseModel, message: str | None = None) -> None:
         if not self.IS_LOGGING:
             return
         
