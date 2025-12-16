@@ -9,7 +9,8 @@ class Logging:
     KABU_LOG_FILE = "kabu-log.txt"
     IS_LOGGING: bool = True
 
-    def __init__(self, logFileName, isLogging: bool = True):
+    # ログを作りたくない場合はファイル名を入れなくてよい
+    def __init__(self, logFileName = "", isLogging: bool = True):
         if not logFileName:
             self.IS_LOGGING = False
             return

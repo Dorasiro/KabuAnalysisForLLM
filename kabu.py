@@ -8,7 +8,7 @@ import pandas
 import pandas_ta_classic as ta
 import jpholiday
 import DB
-from Logging import Logging as log
+from Logging import Logging
 
 # yfinanceのticker.historyに設定できるYYYY-MM-DDの形に変換
 # 分足データは後から取得できないため、dateのみ考慮
@@ -46,7 +46,10 @@ class Backend:
 
 	# リアルタイムの情報を返すときに使う想定　DBに格納しない
 	# ex)今～の株価何円？ -> この関数を経由して返す
-	def get_current_price(self, input: GetCurrentPriceInput) -> str:
+	def get_current_price(self, input: GetCurrentPriceInput, log: Logging = None) -> str:
+		if log == None:
+			log = Logging()
+
 		try:
 			if isinstance(input, dict):
 				input = GetCurrentPriceInput(**input)
@@ -92,7 +95,10 @@ class Backend:
 	
 	# 指定範囲の株価情報をDBから読みだす　DBになければyfから取得する
 	# 内部用　LLMに公開する際にはDataFrameをJSONに変換する関数を挟む
-	def get_price(self, input: GetPriceInput) -> pandas.DataFrame:
+	def get_price(self, input: GetPriceInput, log: Logging = None) -> pandas.DataFrame:
+		if log == None:
+			log = Logging()
+
 		try:
 			if isinstance(input, dict):
 				input = GetPriceInput(**input)
@@ -206,7 +212,10 @@ class Backend:
 		return df
 	
 	# テクニカル分析の内部関数　引数、戻り値ともに他の関数と連携しやすいDataFrameとする
-	def do_technical_analysis(self, df: pandas.DataFrame) -> pandas.DataFrame:
+	def do_technical_analysis(self, df: pandas.DataFrame, log: Logging = None) -> pandas.DataFrame:
+		if log == None:
+			log = Logging()
+
 		# 移動平均線（短期）
 		df.ta.sma(length=25, append=True)
 		# 移動平均線（中期）
