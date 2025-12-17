@@ -10,9 +10,6 @@ import jpholiday
 from database import DB
 from my_logging import Logging
 
-#from workspace.KabuAnalysisForLLM.database import DB
-#from workspace.KabuAnalysisForLLM.my_logging import Logging
-
 # yfinanceのticker.historyに設定できるYYYY-MM-DDの形に変換
 # 分足データは後から取得できないため、dateのみ考慮
 def date_to_yf_history(d: date) -> str:
