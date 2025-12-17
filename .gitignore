@@ -1,3 +1,4 @@
 kabu-log.txt
 *.pyc
 .vscode/settings.json
+build/
