@@ -7,8 +7,11 @@ import yfinance as yf
 import pandas
 import pandas_ta_classic as ta
 import jpholiday
-from DB import DB
+from database import DB
 from my_logging import Logging
+
+#from workspace.KabuAnalysisForLLM.database import DB
+#from workspace.KabuAnalysisForLLM.my_logging import Logging
 
 # yfinanceのticker.historyに設定できるYYYY-MM-DDの形に変換
 # 分足データは後から取得できないため、dateのみ考慮

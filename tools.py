@@ -6,8 +6,9 @@ import kabu
 from my_model import MyModel
 from my_logging import Logging
 
-#import workspace.KabuAnalysisForLLM.my_model as my_model
 #import workspace.KabuAnalysisForLLM.kabu as kabu
+#from workspace.KabuAnalysisForLLM.my_model import MyModel
+#from workspace.KabuAnalysisForLLM.my_logging import Logging
 
 def data_frame_to_dict(df: pandas.DataFrame) -> dict:
 	# まず Python の基本型に変換
