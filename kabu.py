@@ -7,8 +7,8 @@ import yfinance as yf
 import pandas
 import pandas_ta_classic as ta
 import jpholiday
-import DB
-from Logging import Logging
+from DB import DB
+from my_logging import Logging
 
 # yfinanceのticker.historyに設定できるYYYY-MM-DDの形に変換
 # 分足データは後から取得できないため、dateのみ考慮
@@ -39,7 +39,7 @@ class GetPriceInput(BaseModel):
 	chart_granularity: str
 
 class Backend:
-	db = DB.DB()
+	db = DB()
 
 	def __init__(self):
 		pass
