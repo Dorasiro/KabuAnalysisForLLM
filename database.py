@@ -41,6 +41,7 @@ class DB:
         return cls.conn.cursor()
 
     # 現在時刻が取引時間中であるか
+    # 昼休みも考慮する
     def is_market_active(self, ticker: str) -> bool:
         cur = DB.get_cursor()
         cur.execute("""
@@ -98,6 +99,49 @@ class DB:
         if row[1] <= now:
             return True
     
+        return False
+    
+    # 現在時刻が取引終了時刻よりも後であるか
+    def is_market_closed(self, ticker: str, test_now: dt.timedelta) -> bool:
+        cur = DB.get_cursor()
+        cur.execute("""
+            SELECT 
+                m.timezone,
+                m.close1,
+                m.close2
+            FROM securities s
+            JOIN markets m ON s.market_id = m.id
+            WHERE s.code = %s
+        """, (ticker,))
+
+        row = cur.fetchone()
+        if not row:
+            return False  # 該当銘柄なし
+
+        # 現在時刻を市場のタイムゾーンで取得
+        t = dt.datetime.now(ZoneInfo(row[0])).time()
+        #now = dt.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+        now = test_now
+
+        # 時間2がある場合のみ判定
+        if row[2]:
+            if now >= row[2]:
+                return True
+            # 時間2がある場合は時間1をチェックしない
+            else:
+                return False
+
+        # 終了時刻を過ぎているか
+        if now >= row[1]:
+            return True
+
+        return False
+    
+    # 現在時刻が取引時間中であるか
+    def is_market_active(self, ticker: str) -> bool:
+        if self.is_market_open(ticker) and not self.is_market_closed(ticker):
+            return True
+        
         return False
     
     # yfinanceから取得した株価をDBに格納する
