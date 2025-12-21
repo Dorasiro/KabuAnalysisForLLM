@@ -154,22 +154,14 @@ class DB:
             raise ValueError("prices is empty or none")
         
         count = 0
+        cur = DB.get_cursor()
         for index, row in prices.iterrows():
 
             time = None
             if chart_granularity == "minute":
                 time = index.time()
 
-            cur = DB.get_cursor()
-            if index.date() == dt.date.today() and self.is_market_open(ticker):
-                cur.execute("""
-                    INSERT INTO prices (security_id, date, time, open, high, low, close, volume)
-                    VALUES ((SELECT id FROM securities WHERE code=%s), %s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE open = VALUES(open), high = VALUES(high), low  = VALUES(low), close = VALUES(close), volume = VALUES(volume)
-                """, (ticker, index.date(), time, row["Open"], row["High"], row["Low"], row["Close"], row["Volume"]))
-
-            else:
-                cur.execute("""
+            cur.execute("""
                     INSERT INTO prices (security_id, date, time, open, high, low, close, volume)
                     SELECT s.id, %s, %s, %s, %s, %s, %s, %s
                     FROM securities s
