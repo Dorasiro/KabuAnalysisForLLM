@@ -184,21 +184,30 @@ class Backend:
 			history = yf.Ticker(input.ticker).history(start=date_to_yf_history(input.begin_range), end=date_to_yf_history((first_record - timedelta(days=1))))
 			self.db.insert_into_prices(input.ticker, history, chart_granularity)
 
+		current: pandas.DataFrame = None
+
 		# DBに存在するデータよりも後のデータが必要な場合
 		# end_recordの翌日から今日までのデータを取ってくる
 		if end_record is not None and end_record < input.end_range.date():
-			# 不足分のデータが今日のみの場合
-			if end_record + timedelta(days=1) == now.date():
-				# 現在時刻が取引時間開始時刻以降の場合はデータを取ってくる
-				if self.db.is_market_open(input.ticker):
-					history = yf.Ticker(input.ticker).history(period="1d")
-					self.db.insert_into_prices(input.ticker, history, chart_granularity)
-			# 不足分のデータが今日のみでない場合は今日のデータも存在しないので取ってくる
-			else:
-				history = yf.Ticker(input.ticker).history(start=date_to_yf_history((end_record + timedelta(days=1))), end=date_to_yf_history(now.date()))
+			# 前日分までを取得してくる
+			history = yf.Ticker(input.ticker).history(start=date_to_yf_history((end_record + timedelta(days=1))), end=date_to_yf_history(now.date() - timedelta(days=1)))
+			self.db.insert_into_prices(input.ticker, history, chart_granularity)
+
+			# 場中の場合はDBにデータを入れず、戻り値となるdfにだけデータを入れる
+			if self.db.is_market_active(input.ticker):
+				current = history, yf.Ticker(input.ticker).history(period="1d")
+			# 場中でないかつ閉場時間を過ぎている場合は確定データが出ているからDBに入れる
+			elif(self.db.is_market_closed(input.ticker)):
+				history = yf.Ticker(input.ticker).history(period="1d")
 				self.db.insert_into_prices(input.ticker, history, chart_granularity)
+			# 取引開始前が当てはまるが取得できるデータがないので何もしない
+			else:
+				pass
 		
 		df = self.db.select_from_prices(input.ticker, input.begin_range, input.end_range, chart_granularity)
+		if current != None:
+			df = pandas.concat([df, current], ignore_index=True)
+
 		# データが取れていることを確認する（が、通常は問題ないはず）
 		if df is None:
 			raise LookupError("データフレームが空です。")
