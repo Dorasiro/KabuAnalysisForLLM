@@ -10,7 +10,14 @@ def data_frame_to_dict(df: pandas.DataFrame) -> dict:
 	# まず Python の基本型に変換
 	df = df.astype(object)
 	# numpy 型や datetime64 を Python の型に変換
-	df = df.applymap(lambda x: x.isoformat() if hasattr(x, "isoformat") else x)
+		# pandas 2.1以降はapplymapが非推奨になったらしいので置き換え
+		# df = df.applymap(lambda x: x.isoformat() if hasattr(x, "isoformat") else x)
+	df = df.map(lambda x:
+        x.isoformat() if hasattr(x, "isoformat") else
+        x.item() if hasattr(x, "item") else
+        x
+    )
+
 	return df.to_dict(orient="records")
 
 
